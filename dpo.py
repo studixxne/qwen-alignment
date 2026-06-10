@@ -26,6 +26,7 @@ class TrainConfig:
     eval_interval: int = 100
     save_dir: str = "./checkpoints"
     save_interval: int = 100
+    use_wandb: bool = False
 
 class DPODataset(Dataset):
     def __init__(self, samples: list[tuple[str, str, str]], tokenizer: AutoTokenizer, config: TrainConfig):
@@ -150,7 +151,7 @@ def dpo_train(config: TrainConfig):
     train_iter = iter(train_loader)
     policy_model.train()
 
-    logger = Logger("Qwen-alignment", True, config)
+    logger = Logger(config)
     best_val_loss = float('inf')
 
     for step in tqdm(range(total_steps)):

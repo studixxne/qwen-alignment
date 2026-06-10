@@ -7,11 +7,11 @@ import wandb
 import tqdm
 
 class Logger():
-    def __init__(self, project_name: str, use_wandb: bool, config):
-        self.use_wandb = use_wandb
-        if use_wandb:
+    def __init__(self, config: dataclass):
+        self.use_wandb = config.use_wandb
+        if self.use_wandb:
             wandb.init(
-                project=project_name,
+                project=config.project_name,
                 config=vars(config)
             )
 
