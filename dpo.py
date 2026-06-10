@@ -18,9 +18,11 @@ class TrainConfig:
     epochs: int = 2
     lr: int = 4e-6
     weight_decay: float = 0.1
-    warnup_ratio: float = 0.1
+    warmup_ratio: float = 0.1
     batch_size: int = 16
     grad_accum: int = 2
+    log_interval: int = 10
+    eval_interval: int = 100
 
 class DPODataset(Dataset):
     def __init__(self, samples: list[tuple[str, str, str]], tokenizer: AutoTokenizer, config: TrainConfig):
@@ -79,7 +81,7 @@ def load_models(config: TrainConfig) -> tuple[nn.Module, nn.Module, AutoTokenize
     for param in ref_model.parameters():
         param.requires_grad = False
 
-    return tokenizer, policy_model, ref_model
+    return policy_model, ref_model, tokenizer
 
 def get_log_probs(logits: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:
     logits = logits[:, :-1, :]
@@ -88,7 +90,7 @@ def get_log_probs(logits: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:
     log_probs = F.log_softmax(logits, dim=-1) # (batch, seq_len, vocab_size)
     token_log_probs = log_probs.gather(dim=-1, index=labels.unsqueeze(-1)).squeeze(-1) # 각 토큰 y에 대한 확률 추출: (batch, seq_len)
 
-    return token_log_probs # log(pi(y|x)): (batch, )
+    return token_log_probs.sum(dim=-1) # log(pi(y|x))이 -> log(pi(y1|x)*pi(y2|y1)...pi(yn|yn-1) = log(pi(y1|x)) + log(pi(y2|y1)) ... ): (batch, )
 
 def dpo_loss(policy_model: nn.Module, 
              ref_model: nn.Module, 
