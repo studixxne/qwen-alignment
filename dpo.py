@@ -112,6 +112,27 @@ def dpo_loss(policy_model: nn.Module,
 
     return loss, chosen_reward.mean(), rejected_reward.mean()
 
+@torch.no_grad()
+def evaluate(policy_model: nn.Module, ref_model: nn.Module, val_loader: DataLoader, config: TrainConfig) -> float:
+    policy_model.eval()
+
+    total_step = len(val_loader)
+    val_iter = iter(val_loader)
+
+    total_loss = 0.0
+
+    for step in tqdm(range(total_step)):
+        yw, yl = next(val_iter)
+        yw, yl = yw.to(config.device), yl.to(config.device)
+
+        with autocast_ctx(config.device):
+            loss, _, _ = dpo_loss(policy_model, ref_model, yw, yl, config)
+        total_loss += loss.item()
+    
+    policy_model.train()
+
+    return total_loss / total_step
+
 def dpo_train(config: TrainConfig):
     policy_model, ref_model, tokenizer = load_models(config)
 
@@ -157,8 +178,8 @@ def dpo_train(config: TrainConfig):
 
         # eval
         if (step + 1) % config.eval_interval == 0:
-            # val_loss = evaluate()
-            # val_log.append((step, val_loss))
+            val_loss = evaluate(policy_model, ref_model, val_loader, config)
+            val_log.append((step, val_loss))
 
 if __name__ == '__main__':
     import argparse
