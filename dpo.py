@@ -23,6 +23,8 @@ class TrainConfig:
     grad_accum: int = 2
     log_interval: int = 10
     eval_interval: int = 100
+    save_dir: str = "./checkpoints"
+    save_interval: int = 100
 
 class DPODataset(Dataset):
     def __init__(self, samples: list[tuple[str, str, str]], tokenizer: AutoTokenizer, config: TrainConfig):
@@ -149,6 +151,7 @@ def dpo_train(config: TrainConfig):
 
     train_log = []
     val_log = []
+    best_val_loss = float('inf')
 
     for step in tqdm(range(total_steps)):
         try:
@@ -176,12 +179,23 @@ def dpo_train(config: TrainConfig):
             current_lr = scheduler.get_last_lr()[0]
             loss_log = loss.item() * config.grad_accum
             train_log.append((step, loss_log))
-            tqdm.write(f"[{step}|{total_steps}] | loss {loss_log:.4f} | yw_reward {yw_reward:.4f} | yl_reward {yl_reward:.4f} | lr {current_lr}")
+            tqdm.write(f"[{step}|{total_steps}] | loss: {loss_log:.4f} | yw_reward: {yw_reward:.4f} | yl_reward: {yl_reward:.4f} | lr: {current_lr}")
 
         # eval
         if (step + 1) % config.eval_interval == 0:
             val_loss = evaluate(policy_model, ref_model, val_loader, config)
             val_log.append((step, val_loss))
+
+            if val_loss < best_val_loss:
+                best_val_loss = val_loss
+                policy_model.save_pretrained(f"{config.save_dir}/best")
+                tokenizer.save_pretrained(f"{config.save_dir}/best")
+                tqdm.write(f"best model saved | val_loss: {val_loader:.4f}")
+
+        # checkpoint
+        if (step + 1) % config.save_interval == 0:
+            policy_model.save_pretrained(f"{config.save_dir}/step_{step+1}")
+            tokenizer.save_pretrained(f"{config.save_dir}/step_{step+1}")
 
 if __name__ == '__main__':
     import argparse
