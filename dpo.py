@@ -20,8 +20,8 @@ class TrainConfig:
     lr: float = 4e-6
     weight_decay: float = 0.1
     warmup_ratio: float = 0.1
-    batch_size: int = 16
-    grad_accum: int = 2
+    batch_size: int = 1
+    grad_accum: int = 8
     log_interval: int = 10
     eval_interval: int = 100
     save_dir: str = "./checkpoints"
@@ -55,9 +55,14 @@ class DPODataset(Dataset):
         return len(self.samples)
     
 def get_dataloaders(tokenizer: AutoTokenizer, config: TrainConfig) -> tuple[DataLoader, DataLoader]:
-    datas = [
-        ("사과는 왜 빨개?", "저도 정확하게는 잘 모르지만 ~ 입니다.", "사과는 검정색입니다.")
-    ] # 나중에 데이터로 대체
+    datas = (
+    "사과는 왜 빨개?",
+    "안토시아닌 색소 때문입니다.",
+    "사과는 검정색입니다."
+    )
+
+    datas = [datas] * 500
+
 
     split = int(len(datas) * 0.95)
     train_dataset = DPODataset(datas[:split], tokenizer, config)
@@ -79,8 +84,8 @@ def load_models(config: TrainConfig) -> tuple[nn.Module, nn.Module, AutoTokenize
     model_name = config.model_name
 
     tokenizer = AutoTokenizer.from_pretrained(model_name)
-    policy_model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype=torch.float32).to(device)
-    ref_model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype=torch.float32).to(device)
+    policy_model = AutoModelForCausalLM.from_pretrained(model_name, dtype=torch.float16).to(device)
+    ref_model = AutoModelForCausalLM.from_pretrained(model_name, dtype=torch.float16).to(device)
 
     for param in ref_model.parameters():
         param.requires_grad = False
@@ -201,5 +206,7 @@ def dpo_train(config: TrainConfig):
 if __name__ == '__main__':
     torch.set_float32_matmul_precision('high')
 
-    args = get_args()
+    args = get_args(TrainConfig)
     config = TrainConfig(**vars(args))
+
+    dpo_train(config)
