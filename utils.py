@@ -18,7 +18,7 @@ class Color:
 
 class Logger():
     def __init__(self, config: dataclass):
-        self.use_wandb = config.use_wandb
+        self.use_wandb = getattr(config, "use_wandb", False)
         if self.use_wandb:
             wandb.init(
                 project=config.project_name,
