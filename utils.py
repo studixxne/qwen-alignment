@@ -106,6 +106,35 @@ class Logger():
         print(f"{Color.BOLD}Total Generated{Color.RESET} : {Color.GREEN}{Color.BOLD}{total_prompts}{Color.RESET} prompts")
         print(f"{Color.BOLD}Saved Location{Color.RESET}  : {Color.CYAN}{file_path}{Color.RESET}")
         print(f"{Color.GREEN}-" * 65 + Color.RESET + "\n")
+
+    def log_inference_header(self, mode: str, total: int, model_name: str):
+        tqdm.write("\n" + f"{Color.BOLD}{Color.CYAN}=" * 65)
+        tqdm.write(f"Model Inference Started [{mode.upper()}]")
+        tqdm.write(f"Model Name : {model_name}")
+        tqdm.write(f"Total Task : {total} questions")
+        tqdm.write(f"{Color.CYAN}=" * 65 + Color.RESET)
+
+    def log_inference_step(self, idx: int, total: int, question: str, mode: str, responses: list[str]):
+        tqdm.write(f"\n{Color.BOLD}[{idx:04d}|{total:04d}] Inferencing...{Color.RESET}")
+        tqdm.write(f" {Color.CYAN}• Q:{Color.RESET} {question}")
+        
+        if mode == 'eval':
+            tqdm.write(f" {Color.GREEN}• Answer:{Color.RESET} {responses[0]}")
+            
+        elif mode == 'sample':
+            tqdm.write(f" {Color.PURPLE}• Response A:{Color.RESET} {responses[0]}")
+            tqdm.write(f" {Color.BLUE}• Response B:{Color.RESET} {responses[1]}")
+            
+        tqdm.write(f"{Color.CYAN}-" * 60 + Color.RESET)
+
+    def log_inference_summary(self, total: int, file_path: str):
+        tqdm.write("\n")
+        tqdm.write(f"{Color.BOLD}{Color.GREEN}=" * 65)
+        tqdm.write(f"INFERENCE COMPLETE")
+        tqdm.write(f"{Color.GREEN}=" * 65 + Color.RESET)
+        tqdm.write(f"{Color.BOLD}Total Processed{Color.RESET} : {Color.GREEN}{Color.BOLD}{total}{Color.RESET} prompts")
+        tqdm.write(f"{Color.BOLD}Saved Location{Color.RESET}  : {Color.CYAN}{file_path}{Color.RESET}")
+        tqdm.write(f"{Color.GREEN}-" * 65 + Color.RESET + "\n")
     
     def finish(self):
         if self.use_wandb:
