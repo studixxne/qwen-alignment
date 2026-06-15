@@ -84,6 +84,28 @@ class Logger():
             }
             
             wandb.log(metrics)
+
+    def log_gen_prompts(self, loop: int, num_loops: int, new_prompts: list[dict]):
+        categories_list = [p.get("category", "") for p in new_prompts]
+        question_list = [p.get("question", "") for p in new_prompts]
+
+        tqdm.write(f"\n{Color.BOLD}[Loop {loop:02d}|{num_loops:02d}]{Color.RESET} Generating {Color.YELLOW}{Color.BOLD}{len(new_prompts)}{Color.RESET} prompts...")
+        tqdm.write(f" ➔ Selected Categories: [{', '.join(set(categories_list))}]")
+        
+        tqdm.write(f" ➔ 📑 {Color.BOLD}Generated Questions:{Color.RESET}")
+        for idx, q in enumerate(question_list):
+            tqdm.write(f"    {Color.YELLOW}{idx+1:02d}.{Color.RESET} {q}")
+        
+        tqdm.write(f"{Color.BLUE}-" * 60 + Color.RESET)
+
+    def log_gen_summary(self, total_prompts: int, file_path: str):
+        print("\n")
+        print(f"{Color.BOLD}{Color.GREEN}=" * 65)
+        print(f"SYNTHETIC PROMPTS GENERATION RESULTS")
+        print(f"{Color.GREEN}=" * 65 + Color.RESET)
+        print(f"{Color.BOLD}Total Generated{Color.RESET} : {Color.GREEN}{Color.BOLD}{total_prompts}{Color.RESET} prompts")
+        print(f"{Color.BOLD}Saved Location{Color.RESET}  : {Color.CYAN}{file_path}{Color.RESET}")
+        print(f"{Color.GREEN}-" * 65 + Color.RESET + "\n")
     
     def finish(self):
         if self.use_wandb:
