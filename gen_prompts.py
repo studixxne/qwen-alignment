@@ -22,7 +22,7 @@ class GenConfig:
     file_name: str = "synthetic_prompts.json"
     use_wandb: bool = False
 
-    total_generate: int = 40
+    total_generate: int = 1500
     batch_size: int = 20
 
 class SyntheticPrompt(BaseModel):
