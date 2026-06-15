@@ -65,7 +65,6 @@ class Logger():
         tqdm.write("-" * 60)
 
     def log_bench_summary(self, count: dict, total: int):
-        """최종 스코어보드를 출력하고 WandB가 켜져 있다면 정확도 지표를 기록"""
         tqdm.write("\n")
         tqdm.write(f"{Color.BOLD}{Color.BLUE}=" * 60)
         tqdm.write(f"EVALUATION RESULT (Total: {total})")
@@ -76,7 +75,6 @@ class Logger():
         tqdm.write(f"{Color.BLUE}-" * 60 + Color.RESET)
 
         if self.use_wandb:
-            # 훈련 중 실시간 검증 그래프를 그리기 위해 WandB에 기록
             metrics = {
                 "eval/correct_rate": count['CORRECT'] / total,
                 "eval/incorrect_rate": count['INCORRECT'] / total,
@@ -115,15 +113,19 @@ class Logger():
         tqdm.write(f"{Color.CYAN}=" * 65 + Color.RESET)
 
     def log_inference_step(self, idx: int, total: int, question: str, mode: str, responses: list[str]):
-        tqdm.write(f"\n{Color.BOLD}[{idx:04d}|{total:04d}] Inferencing...{Color.RESET}")
+        tqdm.write(f"{Color.BOLD}[{idx:04d}|{total:04d}] Inferencing{Color.RESET}")
         tqdm.write(f" {Color.CYAN}• Q:{Color.RESET} {question}")
+
+        max_len = 150
         
         if mode == 'eval':
-            tqdm.write(f" {Color.GREEN}• Answer:{Color.RESET} {responses[0]}")
+            tqdm.write(f" {Color.GREEN}• Answer:{Color.RESET} {responses[0] if len(responses[0]) < max_len else responses[0][:max_len] + '...'}")
             
         elif mode == 'sample':
-            tqdm.write(f" {Color.PURPLE}• Response A:{Color.RESET} {responses[0]}")
-            tqdm.write(f" {Color.BLUE}• Response B:{Color.RESET} {responses[1]}")
+            tqdm.write(f"\n {Color.PURPLE}• Response A{Color.RESET}")
+            tqdm.write(f"   └ \"{responses[0] if len(responses[0]) < max_len else responses[0][:max_len] + '...'}\"\n")
+            tqdm.write(f" {Color.BLUE}• Response B{Color.RESET}")
+            tqdm.write(f"   └ \"{responses[1] if len(responses[1]) < max_len else responses[1][:max_len] + '...'}\"")
             
         tqdm.write(f"{Color.CYAN}-" * 60 + Color.RESET)
 
