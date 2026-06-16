@@ -15,7 +15,7 @@ class InferenceConfig:
     num_generations: int = 2
     do_sample: bool = True
     input_file: str = "./data/generated/synthetic_prompts.json"
-    output_file: str = "./data/generated/qwen_responses"
+    output_file: str = "./data/generated/qwen_responses.json"
 
 def main():
     args = get_args(InferenceConfig)
