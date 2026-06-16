@@ -76,20 +76,26 @@ def inference(config: InferenceConfig, prompts: list[str]) -> list[list[str]]:
 
     logger.log_inference_header(config.mode, total_prompt, config.model_name)
 
+    model.eval()
     for step, prompt in tqdm(enumerate(prompts), desc=f"Qwen Processing [{config.mode.upper()}]"):
         messages = [{'role': 'user', 'content': prompt}]
         text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
         model_inputs = tokenizer([text], return_tensors='pt').to(config.device)
 
-        responses = []
-        for _ in range(config.num_generations):
-            with torch.no_grad():
-                generated_ids = model.generate(**model_inputs, max_new_tokens=256, do_sample=config.do_sample, temperature=config.temperature)
-            generated_ids = [output_ids[len(input_ids):] for input_ids, output_ids in zip(model_inputs.input_ids, generated_ids)]
-            response_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0].strip()
-            responses.append(response_text)
+        with torch.no_grad():
+            generated_ids = model.generate(**model_inputs, num_return_sequences=config.num_generations, max_new_tokens=256, do_sample=config.do_sample, temperature=config.temperature)
 
+        input_len = model_inputs.input_ids.shape[1]
+        generated_ids = generated_ids[:, input_len:]
+        responses = list(map(lambda x: str.strip(x), tokenizer.batch_decode(generated_ids, skip_special_tokens=True)))
         result.append(responses)
+
+        del model_inputs, generated_ids
+        if step % 50 == 0:
+            if config.device == 'mps':
+                torch.mps.empty_cache()
+            elif config.device == 'cuda':
+                torch.cuda.empty_cache()
 
         logger.log_inference_step(step+1, total_prompt, prompt, config.mode, responses)
 
