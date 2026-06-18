@@ -28,6 +28,7 @@ class TrainConfig:
     grad_accum: int = 8
     log_interval: int = 1
     eval_interval: int = 10
+    max_grad_norm: float = 1.0
     input_file: str = "./data/judged/dpo_qwen_responses.json"
     save_dir: str = "./checkpoints"
     save_interval: int = 100
@@ -186,6 +187,7 @@ def dpo_train(config: TrainConfig):
 
         # update
         if (step + 1) % config.grad_accum == 0:
+            torch.nn.utils.clip_grad_norm_(model.parameters(), config.max_grad_norm)
             optimizer.step()
             scheduler.step()
             optimizer.zero_grad()
