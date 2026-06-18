@@ -1,3 +1,6 @@
+import os
+import json
+
 import torch
 import torch.nn.functional as F
 import torch.nn as nn
@@ -24,6 +27,7 @@ class TrainConfig:
     grad_accum: int = 8
     log_interval: int = 10
     eval_interval: int = 100
+    input_file: str = "./data/judged/dpo_qwen_responses.json"
     save_dir: str = "./checkpoints"
     save_interval: int = 100
     use_wandb: bool = False
@@ -55,14 +59,12 @@ class DPODataset(Dataset):
         return len(self.samples)
     
 def get_dataloaders(tokenizer: AutoTokenizer, config: TrainConfig) -> tuple[DataLoader, DataLoader]:
-    datas = (
-    "사과는 왜 빨개?",
-    "안토시아닌 색소 때문입니다.",
-    "사과는 검정색입니다."
-    )
-
-    datas = [datas] * 500
-
+    # Data 로드
+    if not os.path.exists(config.input_file):
+        raise FileNotFoundError(f"Not exist data files")
+    with open(config.input_file, "r", encoding="utf-8") as f:
+        dataset = json.load(f)
+    datas = [(item['prompt'], item['chosen'], item['rejected']) for item in dataset]
 
     split = int(len(datas) * 0.95)
     train_dataset = DPODataset(datas[:split], tokenizer, config)
