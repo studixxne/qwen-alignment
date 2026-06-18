@@ -21,13 +21,13 @@ class TrainConfig:
     beta: float = 0.1
     max_length: int = 256
     epochs: int = 2
-    lr: float = 2e-5
+    lr: float = 3e-6
     weight_decay: float = 0.01
-    warmup_ratio: float = 0.1
-    batch_size: int = 1
+    warmup_ratio: float = 0.05
+    batch_size: int = 4
     grad_accum: int = 8
-    log_interval: int = 10
-    eval_interval: int = 100
+    log_interval: int = 1
+    eval_interval: int = 10
     input_file: str = "./data/judged/dpo_qwen_responses.json"
     save_dir: str = "./checkpoints"
     save_interval: int = 100
@@ -90,8 +90,8 @@ def load_model(config: TrainConfig) -> tuple[nn.Module, AutoTokenizer]:
     base_model = AutoModelForCausalLM.from_pretrained(model_name, dtype=torch.float16).to(device)
 
     peft_config = LoraConfig(
-        r=8,
-        lora_alpha=16,
+        r=16,
+        lora_alpha=32,
         target_modules=["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
         lora_dropout=0.05,
         bias="none",
@@ -158,10 +158,10 @@ def dpo_train(config: TrainConfig):
     model, tokenizer = load_model(config)
 
     train_loader, val_loader = get_dataloaders(tokenizer, config)
-    total_steps = int(len(train_loader) * config.epochs)
+    total_steps = int(len(train_loader) * config.epochs / config.grad_accum)
 
     optimizer = get_optimizer(model, lr=config.lr, weight_decay=config.weight_decay)
-    scheduler = get_cosine_schedule_with_warmup(optimizer, num_warmup_steps=total_steps*config.warmup_ratio, num_training_steps=total_steps)
+    scheduler = get_cosine_schedule_with_warmup(optimizer, num_warmup_steps=int(total_steps*config.warmup_ratio), num_training_steps=total_steps)
 
     train_iter = iter(train_loader)
     model.train()
