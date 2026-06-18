@@ -8,6 +8,7 @@ from torch.utils.data import Dataset, DataLoader
 
 from dataclasses import dataclass
 from transformers import AutoModelForCausalLM, AutoTokenizer, get_cosine_schedule_with_warmup
+from peft import get_peft_model, LoraConfig, TaskType
 from tqdm import tqdm
 
 from utils import *
@@ -81,18 +82,25 @@ def get_dataloaders(tokenizer: AutoTokenizer, config: TrainConfig) -> tuple[Data
     return train_loader, val_loader
 
 
-def load_models(config: TrainConfig) -> tuple[nn.Module, nn.Module, AutoTokenizer]:
+def load_model(config: TrainConfig) -> tuple[nn.Module, AutoTokenizer]:
     device = config.device
     model_name = config.model_name
 
     tokenizer = AutoTokenizer.from_pretrained(model_name)
-    policy_model = AutoModelForCausalLM.from_pretrained(model_name, dtype=torch.float16).to(device)
-    ref_model = AutoModelForCausalLM.from_pretrained(model_name, dtype=torch.float16).to(device)
+    base_model = AutoModelForCausalLM.from_pretrained(model_name, dtype=torch.float16).to(device)
 
-    for param in ref_model.parameters():
-        param.requires_grad = False
+    peft_config = LoraConfig(
+        r=8,
+        lora_alpha=16,
+        target_modules=["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
+        lora_dropout=0.05,
+        bias="none",
+        task_type=TaskType.CAUSAL_LM
+    )
 
-    return policy_model, ref_model, tokenizer
+    model = get_peft_model(base_model, peft_config)
+
+    return model, tokenizer
 
 def get_log_probs(logits: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:
     logits = logits[:, :-1, :]
@@ -103,20 +111,20 @@ def get_log_probs(logits: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:
 
     return token_log_probs.sum(dim=-1) # log(pi(y|x))이 -> log(pi(y1|x)*pi(y2|y1)...pi(yn|yn-1) = log(pi(y1|x)) + log(pi(y2|y1)) ... ): (batch, )
 
-def dpo_loss(policy_model: nn.Module, 
-             ref_model: nn.Module, 
+def dpo_loss(model: torch.Tensor,
              chosen_ids: torch.Tensor, 
              rejected_ids: torch.Tensor, 
              config: TrainConfig
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     beta = config.beta
 
-    policy_chosen_logits = policy_model(chosen_ids).logits
-    policy_rejected_logits = policy_model(rejected_ids).logits
+    policy_chosen_logits = model(chosen_ids).logits
+    policy_rejected_logits = model(rejected_ids).logits
 
-    with torch.no_grad():
-        ref_chosen_logits = ref_model(chosen_ids).logits
-        ref_rejected_logits = ref_model(rejected_ids).logits
+    with model.disable_adapter():
+        with torch.no_grad():
+            ref_chosen_logits = model(chosen_ids).logits
+            ref_rejected_logits = model(rejected_ids).logits
 
     chosen_reward = beta * (get_log_probs(policy_chosen_logits, chosen_ids) - get_log_probs(ref_chosen_logits, chosen_ids))
     rejected_reward = beta * (get_log_probs(policy_rejected_logits, rejected_ids) - get_log_probs(ref_rejected_logits, rejected_ids))
@@ -126,8 +134,8 @@ def dpo_loss(policy_model: nn.Module,
     return loss, chosen_reward.mean(), rejected_reward.mean()
 
 @torch.no_grad()
-def evaluate(policy_model: nn.Module, ref_model: nn.Module, val_loader: DataLoader, config: TrainConfig) -> float:
-    policy_model.eval()
+def evaluate(model: nn.Module, val_loader: DataLoader, config: TrainConfig) -> float:
+    model.eval()
 
     total_step = len(val_loader)
     val_iter = iter(val_loader)
@@ -139,24 +147,24 @@ def evaluate(policy_model: nn.Module, ref_model: nn.Module, val_loader: DataLoad
         yw, yl = yw.to(config.device), yl.to(config.device)
 
         with autocast_ctx(config.device):
-            loss, _, _ = dpo_loss(policy_model, ref_model, yw, yl, config)
+            loss, _, _ = dpo_loss(model, yw, yl, config)
         total_loss += loss.item()
     
-    policy_model.train()
+    model.train()
 
     return total_loss / total_step
 
 def dpo_train(config: TrainConfig):
-    policy_model, ref_model, tokenizer = load_models(config)
+    model, tokenizer = load_model(config)
 
     train_loader, val_loader = get_dataloaders(tokenizer, config)
     total_steps = int(len(train_loader) * config.epochs)
 
-    optimizer = get_optimizer(policy_model, lr=config.lr, weight_decay=config.weight_decay)
+    optimizer = get_optimizer(model, lr=config.lr, weight_decay=config.weight_decay)
     scheduler = get_cosine_schedule_with_warmup(optimizer, num_warmup_steps=total_steps*config.warmup_ratio, num_training_steps=total_steps)
 
     train_iter = iter(train_loader)
-    policy_model.train()
+    model.train()
 
     logger = Logger(config)
     best_val_loss = float('inf')
@@ -171,7 +179,7 @@ def dpo_train(config: TrainConfig):
         yw, yl = yw.to(config.device), yl.to(config.device)
 
         with autocast_ctx(config.device):
-            loss, yw_reward, yl_reward = dpo_loss(policy_model, ref_model, yw, yl, config)
+            loss, yw_reward, yl_reward = dpo_loss(model, yw, yl, config)
             loss = loss / config.grad_accum
         
         loss.backward()
@@ -190,17 +198,17 @@ def dpo_train(config: TrainConfig):
 
         # eval
         if (step + 1) % config.eval_interval == 0:
-            val_loss = evaluate(policy_model, ref_model, val_loader, config)
+            val_loss = evaluate(model, val_loader, config)
             logger.log_val(step, val_loss)
 
             if val_loss < best_val_loss:
                 best_val_loss = val_loss
-                policy_model.save_pretrained(f"{config.save_dir}/best")
+                model.save_pretrained(f"{config.save_dir}/best")
                 tokenizer.save_pretrained(f"{config.save_dir}/best")
 
         # checkpoint
         if (step + 1) % config.save_interval == 0:
-            policy_model.save_pretrained(f"{config.save_dir}/step_{step+1}")
+            model.save_pretrained(f"{config.save_dir}/step_{step+1}")
             tokenizer.save_pretrained(f"{config.save_dir}/step_{step+1}")
 
     logger.finish()
