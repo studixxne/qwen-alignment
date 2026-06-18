@@ -1,0 +1,16 @@
+# 딥러닝 및 LLM 학습 핵심 패키지
+torch
+transformers
+peft
+datasets
+accelerate
+
+# 데이터 처리 및 유틸리티
+numpy
+pydantic
+python-dotenv
+tqdm
+
+# API 및 모니터링
+google-genai
+wandb
