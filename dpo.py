@@ -194,12 +194,12 @@ def dpo_train(config: TrainConfig):
         if (step + 1) % config.log_interval == 0:
             current_lr = scheduler.get_last_lr()[0]
             loss_log = loss.item() * config.grad_accum
-            logger.log_train(step, loss_log, yw_reward, yl_reward, current_lr)
+            logger.log_train(step+1, loss_log, yw_reward, yl_reward, current_lr)
 
         # eval
         if (step + 1) % config.eval_interval == 0:
             val_loss = evaluate(model, val_loader, config)
-            logger.log_val(step, val_loss)
+            logger.log_val(step+1, val_loss)
 
             if val_loss < best_val_loss:
                 best_val_loss = val_loss
