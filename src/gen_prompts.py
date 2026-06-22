@@ -10,7 +10,7 @@ from datasets import load_dataset
 import numpy as np
 from dotenv import load_dotenv
 
-from utils import get_args, Logger
+from src.utils import get_args, Logger
 
 load_dotenv()
 

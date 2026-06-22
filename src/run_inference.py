@@ -5,7 +5,7 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
 import json
 from peft import PeftModel
-from utils import *
+from src.utils import *
 
 @dataclass
 class InferenceConfig:
