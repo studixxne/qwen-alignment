@@ -19,10 +19,7 @@ class InferenceConfig:
     output_file: str = "./data/generated/qwen_responses.json"
     lora_path: str = None
 
-def main():
-    args = get_args(InferenceConfig)
-    config = InferenceConfig(**vars(args))
-
+def run_inference(config: InferenceConfig):
     tokenizer = AutoTokenizer.from_pretrained(config.model_name)
     model = AutoModelForCausalLM.from_pretrained(config.model_name, dtype=torch.float16).to(config.device)
 
@@ -111,4 +108,6 @@ def inference(model: torch.Tensor, tokenizer: AutoTokenizer, config: InferenceCo
     return result
 
 if __name__ == '__main__':
-    main()
+    args = get_args(InferenceConfig)
+    config = InferenceConfig(**vars(args))
+    run_inference(config)
