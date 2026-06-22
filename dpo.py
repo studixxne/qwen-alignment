@@ -156,6 +156,8 @@ def evaluate(model: nn.Module, val_loader: DataLoader, config: TrainConfig) -> f
     return total_loss / total_step
 
 def dpo_train(config: TrainConfig):
+    torch.set_float32_matmul_precision('high')
+
     model, tokenizer = load_model(config)
 
     train_loader, val_loader = get_dataloaders(tokenizer, config)
@@ -227,9 +229,6 @@ def dpo_train(config: TrainConfig):
     logger.finish()
 
 if __name__ == '__main__':
-    torch.set_float32_matmul_precision('high')
-
     args = get_args(TrainConfig)
     config = TrainConfig(**vars(args))
-
     dpo_train(config)

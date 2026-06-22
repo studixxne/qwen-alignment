@@ -1,5 +1,6 @@
 import os
 import json
+from collections import Counter
 
 from google import genai
 from google.genai import types
@@ -70,7 +71,14 @@ def query_model(client: genai.Client, model: str, prompt: str) -> list[dict]:
         print(f"Prompts generate fail")
         return []
 
-def run_prompt_generation(categories: list[str], prob: list[float], config: GenConfig):
+def run_prompt_generation(config: GenConfig):
+    truthful_qa_categories = load_dataset("truthfulqa/truthful_qa", "generation")["validation"]["category"]
+
+    counts = Counter(truthful_qa_categories)
+    categories = list(counts.keys())
+    total_count = sum(counts.values())
+    prob = [count / total_count for count in counts.values()]
+
     client = genai.Client(vertexai=True, project=config.project_id, location=config.location)
     generated_prompts = []
     logger = Logger(config)
@@ -97,15 +105,6 @@ def run_prompt_generation(categories: list[str], prob: list[float], config: GenC
     logger.finish
     
 if __name__ == "__main__":
-    from collections import Counter
-
     args = get_args(GenConfig)
     config = GenConfig(**vars(args))
-    truthful_qa_categories = load_dataset("truthfulqa/truthful_qa", "generation")["validation"]["category"]
-
-    counts = Counter(truthful_qa_categories)
-    categories = list(counts.keys())
-    total_count = sum(counts.values())
-    prob = [count / total_count for count in counts.values()]
-
-    run_prompt_generation(categories, prob, config)
+    run_prompt_generation(config)
