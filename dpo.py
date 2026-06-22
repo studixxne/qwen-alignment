@@ -159,16 +159,19 @@ def dpo_train(config: TrainConfig):
     model, tokenizer = load_model(config)
 
     train_loader, val_loader = get_dataloaders(tokenizer, config)
-    total_steps = int(len(train_loader) * config.epochs / config.grad_accum)
+    total_steps = len(train_loader) * config.epochs
+    update_steps = int(total_steps / config.grad_accum)
 
     optimizer = get_optimizer(model, lr=config.lr, weight_decay=config.weight_decay)
-    scheduler = get_cosine_schedule_with_warmup(optimizer, num_warmup_steps=int(total_steps*config.warmup_ratio), num_training_steps=total_steps)
+    scheduler = get_cosine_schedule_with_warmup(optimizer, num_warmup_steps=int(update_steps*config.warmup_ratio), num_training_steps=update_steps)
 
     train_iter = iter(train_loader)
     model.train()
 
     logger = Logger(config)
     best_val_loss = float('inf')
+    u_step = 1
+    acc_loss, acc_yw, acc_yl = 0.0, 0.0, 0.0
 
     for step in tqdm(range(total_steps)):
         try:
@@ -185,18 +188,26 @@ def dpo_train(config: TrainConfig):
         
         loss.backward()
 
+        acc_loss += loss.item() * config.grad_accum
+        acc_yw += yw_reward.item()
+        acc_yl += yl_reward.item()
+
         # update
         if (step + 1) % config.grad_accum == 0:
             torch.nn.utils.clip_grad_norm_(model.parameters(), config.max_grad_norm)
             optimizer.step()
             scheduler.step()
             optimizer.zero_grad()
+            u_step += 1
 
-        # loging
-        if (step + 1) % config.log_interval == 0:
-            current_lr = scheduler.get_last_lr()[0]
-            loss_log = loss.item() * config.grad_accum
-            logger.log_train(step+1, loss_log, yw_reward, yl_reward, current_lr)
+            # loging
+            if u_step % config.log_interval == 0:
+                current_lr = scheduler.get_last_lr()[0]
+                loss_log = acc_loss / (config.grad_accum * config.log_interval)
+                yw_log = acc_yw / (config.grad_accum * config.log_interval)
+                yl_log = acc_yl / (config.grad_accum * config.log_interval)
+                logger.log_train(step+1, loss_log, yw_log, yl_log, current_lr)
+                acc_loss, acc_yw, acc_yl = 0.0, 0.0, 0.0
 
         # eval
         if (step + 1) % config.eval_interval == 0:
