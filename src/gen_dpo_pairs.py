@@ -15,10 +15,9 @@ load_dotenv()
 
 @dataclass
 class JudgeConfig:
-    project_id: str = os.getenv("GCP_PROJECT_NAME")
-    model: str = "gemini-2.5-flash"
+    project_id: str = os.getenv("GCP_PROJECT_ID")
+    judge_model: str = "gemini-2.5-flash"
     location: str = "us-central1"
-    file_name: str = "qwen_truthfulqa.json"
     input_file: str = "./data/02_model_responses.json"
     output_file: str = "./data/03_dpo_pairs.json"
 
@@ -97,12 +96,12 @@ def run_dpo_llm_judge(config: JudgeConfig):
         # 1차 검증
         # LLM judge의 Position Bias를 예방하기 위해서 교차 검증 후 동일하게 판단한 학습 데이터만 사용
         prompt = llm_judge_template(question, res_a, res_b)
-        response = query_model(client, config.model, prompt)
+        response = query_model(client, config.judge_model, prompt)
         judge1, comment1 = response['judge'], response['comment']
 
         # 순서 바꾸어서 2차 검증
         prompt = llm_judge_template(question, res_b, res_a)
-        response = query_model(client, config.model, prompt)
+        response = query_model(client, config.judge_model, prompt)
         judge2, comment2 = response['judge'], response['comment']
 
         if judge1 == 'A' and judge2 == 'B':

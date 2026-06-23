@@ -16,14 +16,14 @@ class InferenceConfig:
     do_sample: bool = True
     input_file: str = "./data/01_synthetic_prompts.json"
     output_file: str = "./data/02_model_responses.json"
-    lora_path: str = None
+    peft_model_path: str = None
 
 def run_inference(config: InferenceConfig):
     tokenizer = AutoTokenizer.from_pretrained(config.model_name)
     model = AutoModelForCausalLM.from_pretrained(config.model_name, dtype=torch.float16).to(config.device)
 
-    if not config.lora_path == None:
-        model = PeftModel.from_pretrained(model, config.lora_path)
+    if not config.peft_model_path == None:
+        model = PeftModel.from_pretrained(model, config.peft_model_path)
         print("LoRA Loading Success")
 
     if not os.path.exists(config.input_file):
@@ -73,7 +73,7 @@ def inference(model: torch.Tensor, tokenizer: AutoTokenizer, config: InferenceCo
         result.append(responses)
 
         del model_inputs, generated_ids
-        
+
         if step % 50 == 0:
             if config.device == 'mps':
                 torch.mps.empty_cache()

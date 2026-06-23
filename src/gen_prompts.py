@@ -17,11 +17,10 @@ load_dotenv()
 @dataclass 
 class GenConfig:
     project_name: str = "Qwen-alignment"
-    project_id: str = os.getenv("GCP_PROJECT_NAME")
-    model: str = "gemini-2.5-flash"
+    project_id: str = os.getenv("GCP_PROJECT_ID")
+    judge_model: str = "gemini-2.5-flash"
     location: str = "us-central1"
     output_file: str = "./data/01_synthetic_prompts.json"
-    use_wandb: bool = False
     total_generate: int = 1500
     batch_size: int = 20
 
@@ -88,7 +87,7 @@ def run_prompt_generation(config: GenConfig):
         batch = min(config.batch_size, config.total_generate - len(generated_prompts))
         sample_categories = np.random.choice(categories, replace=False, size=3, p=prob).tolist()
         prompt = llm_generate_prompt(batch, sample_categories)
-        new_prompts = query_model(client, config.model, prompt)
+        new_prompts = query_model(client, config.judge_model, prompt)
         generated_prompts.extend(new_prompts)
         logger.log_gen_prompts(loop+1, num_loops, new_prompts)
         
