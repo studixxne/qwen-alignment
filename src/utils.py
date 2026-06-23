@@ -105,28 +105,23 @@ class Logger():
         print(f"{Color.BOLD}Saved Location{Color.RESET}  : {Color.CYAN}{file_path}{Color.RESET}")
         print(f"{Color.GREEN}-" * 65 + Color.RESET + "\n")
 
-    def log_inference_header(self, mode: str, total: int, model_name: str):
+    def log_inference_header(self, total: int, model_name: str):
         tqdm.write("\n" + f"{Color.BOLD}{Color.CYAN}=" * 65)
-        tqdm.write(f"Model Inference Started [{mode.upper()}]")
+        tqdm.write(f"Model Inference Started")
         tqdm.write(f"Model Name : {model_name}")
         tqdm.write(f"Total Task : {total} questions")
         tqdm.write(f"{Color.CYAN}=" * 65 + Color.RESET)
 
-    def log_inference_step(self, idx: int, total: int, question: str, mode: str, responses: list[str]):
+    def log_inference_step(self, idx: int, total: int, question: str, responses: list[str]):
         tqdm.write(f"{Color.BOLD}[{idx:04d}|{total:04d}] Inferencing{Color.RESET}")
         tqdm.write(f" {Color.CYAN}• Q:{Color.RESET} {question}")
 
         max_len = 150
-        
-        if mode == 'eval':
-            tqdm.write(f" {Color.GREEN}• Answer:{Color.RESET} {responses[0] if len(responses[0]) < max_len else responses[0][:max_len] + '...'}")
-            
-        elif mode == 'sample':
-            tqdm.write(f"\n {Color.PURPLE}• Response A{Color.RESET}")
-            tqdm.write(f"   └ \"{responses[0] if len(responses[0]) < max_len else responses[0][:max_len] + '...'}\"\n")
-            tqdm.write(f" {Color.BLUE}• Response B{Color.RESET}")
-            tqdm.write(f"   └ \"{responses[1] if len(responses[1]) < max_len else responses[1][:max_len] + '...'}\"")
-            
+
+        tqdm.write(f"\n {Color.PURPLE}• Response A{Color.RESET}")
+        tqdm.write(f"   └ \"{responses[0] if len(responses[0]) < max_len else responses[0][:max_len] + '...'}\"\n")
+        tqdm.write(f" {Color.BLUE}• Response B{Color.RESET}")
+        tqdm.write(f"   └ \"{responses[1] if len(responses[1]) < max_len else responses[1][:max_len] + '...'}\"")
         tqdm.write(f"{Color.CYAN}-" * 60 + Color.RESET)
 
     def log_inference_summary(self, total: int, file_path: str):
