@@ -16,6 +16,8 @@ class EvalConfig:
     peft_model_path: str = None
     use_wandb: bool = False
     project_name: str = "Qwen-alignment"
+    run_name: str = None
+    run_id: str = None
 
 def load_model(base_model_name: str, peft_model_path: str, device: str) -> tuple[torch.Tensor, AutoTokenizer]:
     tokenizer = AutoTokenizer.from_pretrained(base_model_name)

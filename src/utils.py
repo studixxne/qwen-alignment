@@ -20,9 +20,16 @@ class Logger():
     def __init__(self, config: dataclass):
         self.use_wandb = getattr(config, "use_wandb", False)
         if self.use_wandb:
+            run_id = getattr(config, "run_id", None)
+            run_name = getattr(config, "run_name", None)
+            resume = "allow" if run_id else None
+
             wandb.init(
                 project=config.project_name,
-                config=vars(config)
+                name=run_name,
+                id=run_id,
+                resume=resume,
+                config=vars(config),
             )
         
     def log_train(self, step: int, loss: float, yw_reward: float, yl_reward: float, lr: float):

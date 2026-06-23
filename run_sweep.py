@@ -3,6 +3,7 @@ import json
 from itertools import product
 import subprocess
 import argparse
+import wandb
 
 def load_base_config():
     with open ("configs/config.json", "r", encoding="utf-8") as f:
@@ -37,6 +38,7 @@ def main():
 
         exp_config = base_config.copy()
 
+        current_run_id = wandb.util.generate_id()
         model_dir_name = f"model_{lr}_{beta}"
         model_save_path = f"./models/{model_dir_name}"
         os.makedirs(model_save_path, exist_ok=True)
@@ -44,7 +46,11 @@ def main():
         exp_config["dpo"]["lr"] = lr
         exp_config["dpo"]["beta"] = beta
         exp_config["dpo"]["output_dir"] = model_save_path
+        exp_config["dpo"]["run_name"] = model_dir_name
+        exp_config["dpo"]["run_id"] = current_run_id
         exp_config["eval_mc"]["peft_model_path"] = model_save_path
+        exp_config["eval_mc"]["run_name"] = model_dir_name
+        exp_config["eval_mc"]["run_id"] = current_run_id
 
         sweep_config_path = f"{model_save_path}/run_config.json"
         save_temp_config(exp_config, sweep_config_path)

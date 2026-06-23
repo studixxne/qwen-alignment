@@ -33,6 +33,8 @@ class TrainConfig:
     output_dir: str = "./models/model"
     save_interval: int = 100
     use_wandb: bool = False
+    run_name: str = None
+    run_id: str = None
 
 class DPODynamicCollator:
     def __init__(self, pad_token_id):
