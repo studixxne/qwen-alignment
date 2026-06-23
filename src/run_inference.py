@@ -15,8 +15,8 @@ class InferenceConfig:
     temperature: float = 0.9
     num_generations: int = 2
     do_sample: bool = True
-    input_file: str = "./data/generated/synthetic_prompts.json"
-    output_file: str = "./data/generated/qwen_responses.json"
+    input_file: str = "./data/01_synthetic_prompts.json"
+    output_file: str = "./data/02_model_responses.json"
     lora_path: str = None
 
 def run_inference(config: InferenceConfig):
@@ -25,7 +25,7 @@ def run_inference(config: InferenceConfig):
 
     if not config.lora_path == None:
         model = PeftModel.from_pretrained(model, config.lora_path)
-        print("LoRA 적용 완료")
+        print("LoRA Loading Success")
 
     dataset = None
 

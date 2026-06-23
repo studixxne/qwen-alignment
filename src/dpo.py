@@ -29,8 +29,8 @@ class TrainConfig:
     log_interval: int = 1
     eval_interval: int = 10
     max_grad_norm: float = 1.0
-    input_file: str = "./data/judged/dpo_qwen_responses.json"
-    save_dir: str = "./checkpoints"
+    input_file: str = "./data/03_dpo_pairs.json"
+    output_dir: str = "./models/model"
     save_interval: int = 100
     use_wandb: bool = False
 
@@ -218,13 +218,13 @@ def dpo_train(config: TrainConfig):
 
             if val_loss < best_val_loss:
                 best_val_loss = val_loss
-                model.save_pretrained(f"{config.save_dir}/best")
-                tokenizer.save_pretrained(f"{config.save_dir}/best")
+                model.save_pretrained(f"{config.output_dir}/best")
+                tokenizer.save_pretrained(f"{config.output_dir}/best")
 
         # checkpoint
         if (step + 1) % config.save_interval == 0:
-            model.save_pretrained(f"{config.save_dir}/step_{step+1}")
-            tokenizer.save_pretrained(f"{config.save_dir}/step_{step+1}")
+            model.save_pretrained(f"{config.output_dir}/step_{step+1}")
+            tokenizer.save_pretrained(f"{config.output_dir}/step_{step+1}")
 
     logger.finish()
 

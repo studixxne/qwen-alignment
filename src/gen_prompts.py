@@ -20,9 +20,8 @@ class GenConfig:
     project_id: str = os.getenv("GCP_PROJECT_NAME")
     model: str = "gemini-2.5-flash"
     location: str = "us-central1"
-    file_name: str = "synthetic_prompts.json"
+    output_file: str = "./data/01_synthetic_prompts.json"
     use_wandb: bool = False
-
     total_generate: int = 1500
     batch_size: int = 20
 
@@ -94,14 +93,11 @@ def run_prompt_generation(config: GenConfig):
         logger.log_gen_prompts(loop+1, num_loops, new_prompts)
         
 
-    output_dir = "./data/generated/"
-    os.makedirs(output_dir, exist_ok=True)
-    file_path = os.path.join(output_dir, config.file_name)
-
-    with open(file_path, "w", encoding="utf-8") as f:
+    os.makedirs(os.path.dirname(config.output_file), exist_ok=True)
+    with open(config.output_file, "w", encoding="utf-8") as f:
         json.dump(generated_prompts, f, ensure_ascii=False, indent=2)
 
-    logger.log_gen_summary(len(generated_prompts), file_path)
+    logger.log_gen_summary(len(generated_prompts), config.output_file)
     logger.finish
     
 if __name__ == "__main__":

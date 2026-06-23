@@ -19,6 +19,8 @@ class JudgeConfig:
     model: str = "gemini-2.5-flash"
     location: str = "us-central1"
     file_name: str = "qwen_truthfulqa.json"
+    input_file: str = "./data/02_model_responses.json"
+    output_file: str = "./data/03_dpo_pairs.json"
 
 class DPOJudgeResult(BaseModel):
     comment: str
@@ -81,10 +83,9 @@ def run_dpo_llm_judge(config: JudgeConfig):
         location=config.location
     )
 
-    file_path = f"./data/generated/{config.file_name}"
-    if not os.path.exists(file_path):
-        raise FileNotFoundError(f"no exist file: {file_path}")
-    with open(file_path, "r", encoding="utf-8") as f:
+    if not os.path.exists(config.input_file):
+        raise FileNotFoundError(f"no exist file: {config.input_file}")
+    with open(config.input_file, "r", encoding="utf-8") as f:
         dataset = json.load(f)
 
     results = []
@@ -145,9 +146,11 @@ def run_dpo_llm_judge(config: JudgeConfig):
         tqdm.write("-" * 65)
 
     # 원본 채점 로그 저장
-    output_path = f"./data/judged/log_{config.file_name}"
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    with open(output_path, "w", encoding="utf-8") as f:
+    dirname = os.path.dirname(config.output_file)
+    basename = os.path.basename(config.output_file)
+    log_output = os.path.join(dirname, f"log_{basename}")
+    os.makedirs(dirname, exist_ok=True)
+    with open(log_output, "w", encoding="utf-8") as f:
         json.dump(results, f, ensure_ascii=False, indent=2)
 
     # DPO Dataset 저장
@@ -164,9 +167,8 @@ def run_dpo_llm_judge(config: JudgeConfig):
             'rejected': rejected
         })
     
-    output_path = f"./data/judged/{config.file_name}"
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    with open(output_path, "w", encoding="utf-8") as f:
+    os.makedirs(os.path.dirname(config.output_file), exist_ok=True)
+    with open(config.output_file, "w", encoding="utf-8") as f:
         json.dump(dpo_dataset, f, ensure_ascii=False, indent=2)
 
     # 최종 DPO Dataset 생성 결과 터미널 출력
