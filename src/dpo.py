@@ -34,6 +34,22 @@ class TrainConfig:
     save_interval: int = 100
     use_wandb: bool = False
 
+class DPODynamicCollator:
+    def __init__(self, pad_token_id):
+        self.pad_token_id = pad_token_id
+
+    def __call__(self, batch):
+        chosen_ids = [item[0] for item in batch]
+        rejected_ids = [item[1] for item in batch]
+
+        padded_chosen = torch.nn.utils.rnn.pad_sequence(chosen_ids, batch_first=True, padding_value=self.pad_token_id)
+        padded_rejected = torch.nn.utils.rnn.pad_sequence(rejected_ids, batch_first=True, padding_value=self.pad_token_id)
+
+        chosen_mask = (padded_chosen != self.pad_token_id).long()
+        rejected_mask = (padded_rejected != self.pad_token_id).long()
+
+        return padded_chosen, padded_rejected, chosen_mask, rejected_mask
+
 class DPODataset(Dataset):
     def __init__(self, samples: list[tuple[str, str, str]], tokenizer: AutoTokenizer, config: TrainConfig):
         self.samples = samples
@@ -47,7 +63,7 @@ class DPODataset(Dataset):
         ]
 
         text = self.tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=False)
-        input_ids = self.tokenizer(text, return_tensors='pt', max_length=self.max_length, truncation=True, padding="max_length").input_ids
+        input_ids = self.tokenizer(text, return_tensors='pt', max_length=self.max_length, truncation=True).input_ids
         return input_ids.squeeze(0)
 
     def __getitem__(self, index) -> tuple[torch.Tensor, torch.Tensor]:
@@ -75,10 +91,15 @@ def get_dataloaders(tokenizer: AutoTokenizer, config: TrainConfig) -> tuple[Data
     is_cuda = (config.device == 'cuda')
     num_workers = 4 if is_cuda else 0
 
+    if tokenizer.pad_token_id is None:
+        tokenizer.pad_token_id = tokenizer.eos_token_id
+
+    dynamic_collator = DPODynamicCollator(pad_token_id=tokenizer.pad_token_id)
+
     train_loader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True,
-                              num_workers=num_workers, pin_memory=is_cuda, persistent_workers=is_cuda)
+                              num_workers=num_workers, pin_memory=is_cuda, persistent_workers=is_cuda, collate_fn=dynamic_collator)
     val_loader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False,
-                            num_workers=num_workers, pin_memory=is_cuda, persistent_workers=is_cuda)
+                            num_workers=num_workers, pin_memory=is_cuda, persistent_workers=is_cuda, collate_fn=dynamic_collator)
     
     return train_loader, val_loader
 
@@ -103,32 +124,36 @@ def load_model(config: TrainConfig) -> tuple[nn.Module, AutoTokenizer]:
 
     return model, tokenizer
 
-def get_log_probs(logits: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:
+def get_log_probs(logits: torch.Tensor, labels: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
     logits = logits[:, :-1, :]
     labels = labels[:, 1:]
+    mask = mask[:, 1:]
 
     log_probs = F.log_softmax(logits, dim=-1) # (batch, seq_len, vocab_size)
     token_log_probs = log_probs.gather(dim=-1, index=labels.unsqueeze(-1)).squeeze(-1) # 각 토큰 y에 대한 확률 추출: (batch, seq_len)
+    token_log_probs = token_log_probs * mask
 
     return token_log_probs.sum(dim=-1) # log(pi(y|x))이 -> log(pi(y1|x)*pi(y2|y1)...pi(yn|yn-1) = log(pi(y1|x)) + log(pi(y2|y1)) ... ): (batch, )
 
 def dpo_loss(model: torch.Tensor,
              chosen_ids: torch.Tensor, 
-             rejected_ids: torch.Tensor, 
+             rejected_ids: torch.Tensor,
+             chosen_mask: torch.Tensor,
+             rejected_mask: torch.Tensor, 
              config: TrainConfig
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     beta = config.beta
 
-    policy_chosen_logits = model(chosen_ids).logits
-    policy_rejected_logits = model(rejected_ids).logits
+    policy_chosen_logits = model(chosen_ids, attention_mask=chosen_mask).logits
+    policy_rejected_logits = model(rejected_ids, attention_mask=rejected_mask).logits
 
     with model.disable_adapter():
         with torch.no_grad():
-            ref_chosen_logits = model(chosen_ids).logits
-            ref_rejected_logits = model(rejected_ids).logits
+            ref_chosen_logits = model(chosen_ids, attention_mask=chosen_mask).logits
+            ref_rejected_logits = model(rejected_ids, attention_mask=rejected_mask).logits
 
-    chosen_reward = beta * (get_log_probs(policy_chosen_logits, chosen_ids) - get_log_probs(ref_chosen_logits, chosen_ids))
-    rejected_reward = beta * (get_log_probs(policy_rejected_logits, rejected_ids) - get_log_probs(ref_rejected_logits, rejected_ids))
+    chosen_reward = beta * (get_log_probs(policy_chosen_logits, chosen_ids, chosen_mask) - get_log_probs(ref_chosen_logits, chosen_ids, chosen_mask))
+    rejected_reward = beta * (get_log_probs(policy_rejected_logits, rejected_ids, rejected_mask) - get_log_probs(ref_rejected_logits, rejected_ids, rejected_mask))
 
     loss = -F.logsigmoid(chosen_reward - rejected_reward).mean()
 
@@ -144,11 +169,12 @@ def evaluate(model: nn.Module, val_loader: DataLoader, config: TrainConfig) -> f
     total_loss = 0.0
 
     for step in tqdm(range(total_step)):
-        yw, yl = next(val_iter)
+        yw, yl, yw_mask, yl_mask = next(val_iter)
         yw, yl = yw.to(config.device), yl.to(config.device)
+        yw_mask, yl_mask = yw_mask.to(config.device), yl_mask.to(config.device)
 
         with autocast_ctx(config.device):
-            loss, _, _ = dpo_loss(model, yw, yl, config)
+            loss, _, _ = dpo_loss(model, yw, yl, yw_mask, yl_mask, config)
         total_loss += loss.item()
     
     model.train()
@@ -177,15 +203,16 @@ def dpo_train(config: TrainConfig):
 
     for step in tqdm(range(total_steps)):
         try:
-            yw, yl = next(train_iter)
+            yw, yl, yw_mask, yl_mask = next(train_iter)
         except StopIteration:
             train_iter = iter(train_loader)
-            yw, yl = next(train_iter)
+            yw, yl, yw_mask, yl_mask = next(train_iter)
 
         yw, yl = yw.to(config.device), yl.to(config.device)
+        yw_mask, yl_mask = yw_mask.to(config.device), yl_mask.to(config.device)
 
         with autocast_ctx(config.device):
-            loss, yw_reward, yl_reward = dpo_loss(model, yw, yl, config)
+            loss, yw_reward, yl_reward = dpo_loss(model, yw, yl, yw_mask, yl_mask, config)
             loss = loss / config.grad_accum
         
         loss.backward()
