@@ -30,7 +30,7 @@ class TrainConfig:
     eval_interval: int = 10
     max_grad_norm: float = 1.0
     input_file: str = "./data/03_dpo_pairs.json"
-    output_dir: str = "./models/model"
+    output_dir: str = "./models/aligned_model"
     save_interval: int = 100
     use_wandb: bool = False
     run_name: str = None

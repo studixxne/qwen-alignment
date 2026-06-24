@@ -72,9 +72,8 @@ def main():
             print(" ➔ [1/2] Base Model Evaluation Skipped")
 
         print(" ➔ [2/2] Aligned Model Evaluation")
-        # 기본값을 ./checkpoints/best 에서 ./models/best_model 로 변경!
         aligned_cfg = eval_cfg.copy()
-        aligned_cfg["peft_model_path"] = eval_cfg.get("peft_model_path", "./models/best_model")
+        aligned_cfg["peft_model_path"] = eval_cfg.get("peft_model_path", "./models/aligned_model")
         evaluate_truthfulqa_mc(EvalConfig(**aligned_cfg))
 
 if __name__ == "__main__":

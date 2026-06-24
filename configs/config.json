@@ -27,9 +27,9 @@
     "use_wandb": true,
     "model_name": "Qwen/Qwen2.5-1.5B-Instruct",
     "input_file": "./data/03_dpo_pairs.json",
-    "output_dir": "./models/best_model",
+    "output_dir": "./models/aligned_model",
     "beta": 0.1,
-    "max_length": 1024,
+    "max_length": 2048,
     "epochs": 2,
     "lr": 3e-6,
     "weight_decay": 0.01,
@@ -48,7 +48,7 @@
     "project_name": "Qwen-alignment",
     "use_wandb": true,
     "model_name": "Qwen/Qwen2.5-1.5B-Instruct",
-    "peft_model_path": "./models/best_model",
+    "peft_model_path": "./models/aligned_model",
     "run_name": null,
     "run_id": null
   }
