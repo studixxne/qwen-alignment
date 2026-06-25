@@ -34,7 +34,7 @@
     "lr": 3e-6,
     "weight_decay": 0.01,
     "warmup_ratio": 0.05,
-    "batch_size": 4,
+    "batch_size": 2,
     "grad_accum": 8,
     "log_interval": 1,
     "eval_interval": 10,
