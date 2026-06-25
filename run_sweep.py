@@ -59,8 +59,7 @@ def main():
             command = [
                 "python", "run_pipeline.py",
                 "--steps", "dpo", "eval_mc",
-                "--config", sweep_config_path,
-                "--skip_base_eval"
+                "--config", sweep_config_path
             ]
             subprocess.run(command, check=True)
 
