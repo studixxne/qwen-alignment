@@ -15,7 +15,7 @@ def save_temp_config(config_dict, path):
     
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--learning_rates", nargs="+", type=float, default=[3e-6, 7e-6, 1e-5])
+    parser.add_argument("--learning_rates", nargs="+", type=float, default=[3e-6, 7e-6, 1e-5, 4e-5, 7e-5])
     parser.add_argument("--betas", nargs="+", type=float, default=[0.01, 0.05, 0.1])
     return parser.parse_known_args()[0]
 
